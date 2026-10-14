@@ -1,0 +1,33 @@
+# Data, models, caches, and run artifacts
+data/raw/
+data/processed/
+data/benchmarks/
+data/external/
+data/cache/
+model/
+cache/
+outputs/
+logs/
+swanlog/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+
+# Local credentials and packaged native dependencies
+token
+*.tar.xz
+*.zip

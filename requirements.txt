@@ -1,0 +1,12 @@
+torch
+dgl
+dgllife
+einops
+yacs
+rdkit
+transformers
+scikit-learn
+shap
+pandas
+numpy
+swanlab

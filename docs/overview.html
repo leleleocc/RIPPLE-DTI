@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RIPPLE-DTI 创新点、数据与训练</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1f2430;
+    --muted: #6b7280;
+    --line: #e6e2d8;
+    --card: #ffffff;
+    --primary: #1f6f6a;
+    --primary-soft: #e7f2f0;
+    --aux: #b5812f;
+    --aux-soft: #fbf3e4;
+    --data: #3d5a99;
+    --data-soft: #eaf0f8;
+    --loss: #7d4e7a;
+    --loss-soft: #f6eef5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Songti SC", serif;
+    line-height: 1.5;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+  h1 { font-size: 34px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--muted); margin: 0 0 36px; font-family: "Avenir Next", "PingFang SC", sans-serif; font-size: 15px; }
+  h2 { font-size: 20px; margin: 48px 0 14px; font-weight: 600; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; font-family: "Avenir Next", "PingFang SC", sans-serif; font-size: 13px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  .swatch.primary { background: var(--primary); }
+  .swatch.aux { background: var(--aux); }
+  .swatch.data { background: var(--data); }
+  .swatch.loss { background: var(--loss); }
+
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: "Avenir Next", "PingFang SC", sans-serif; }
+  .node-label { font-size: 13px; font-weight: 600; fill: #fff; }
+  .node-sub { font-size: 11px; fill: rgba(255,255,255,0.85); }
+  .edge-label { font-size: 11px; fill: var(--muted); }
+  .frame-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 16px; }
+  .card h3 { margin: 0 0 4px; font-size: 16px; }
+  .tag { display: inline-block; font-family: "Avenir Next", "PingFang SC", sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; padding: 2px 8px; border-radius: 99px; margin-bottom: 10px; }
+  .tag.primary { background: var(--primary-soft); color: var(--primary); }
+  .tag.aux { background: var(--aux-soft); color: var(--aux); }
+  .card p { margin: 0; font-size: 14px; color: #3a4150; }
+  .card .feeds { margin-top: 10px; font-family: "Avenir Next", "PingFang SC", sans-serif; font-size: 12px; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--line); font-size: 14px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f6f4ee; font-family: "Avenir Next", "PingFang SC", sans-serif; font-size: 12px; letter-spacing: 0.03em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td code { font-family: "SF Mono", ui-monospace, monospace; font-size: 12px; background: #f3f1ea; padding: 1px 5px; border-radius: 4px; }
+  .note { font-family: "Avenir Next", "PingFang SC", sans-serif; font-size: 13px; color: var(--muted); margin-top: 14px; }
+
+  .stages { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .stage { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; position: relative; }
+  .stage .idx { font-family: "Avenir Next", "PingFang SC", sans-serif; font-size: 11px; color: var(--muted); }
+  .stage h3 { margin: 2px 0 6px; font-size: 14px; }
+  .stage ul { margin: 0; padding-left: 16px; font-size: 12.5px; color: #3a4150; }
+  .stage ul li { margin: 2px 0; }
+  @media (max-width: 760px) {
+    .grid, .stages { grid-template-columns: 1fr; }
+    h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>RIPPLE-DTI</h1>
+  <p class="subtitle">配体条件的 pocket-to-function 传播 · 两主一辅</p>
+
+  <div class="legend">
+    <span><i class="swatch primary"></i>主创新</span>
+    <span><i class="swatch aux"></i>辅助创新</span>
+    <span><i class="swatch data"></i>数据特征</span>
+    <span><i class="swatch loss"></i>监督信号</span>
+  </div>
+
+  <svg viewBox="0 0 1040 560" role="img" aria-label="RIPPLE-DTI 数据流：特征进入三个模块，再汇入多任务损失">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="#9aa0ab"/>
+      </marker>
+    </defs>
+
+    <!-- column captions -->
+    <text class="frame-label" x="70" y="28" fill="#3d5a99">数据特征</text>
+    <text class="frame-label" x="430" y="28" fill="#1f6f6a">模型</text>
+    <text class="frame-label" x="860" y="28" fill="#7d4e7a">监督</text>
+
+    <!-- data nodes -->
+    <g>
+      <rect x="30" y="52" width="200" height="52" rx="8" fill="#3d5a99"/>
+      <text class="node-label" x="130" y="74" text-anchor="middle">SMILES</text>
+      <text class="node-sub" x="130" y="91" text-anchor="middle">1D token · 2D 图 · 多构象 3D</text>
+
+      <rect x="30" y="124" width="200" height="52" rx="8" fill="#3d5a99"/>
+      <text class="node-label" x="130" y="146" text-anchor="middle">蛋白序列 + 结构</text>
+      <text class="node-sub" x="130" y="163" text-anchor="middle">残基特征 · 坐标 · 残基图</text>
+
+      <rect x="30" y="196" width="200" height="52" rx="8" fill="#3d5a99"/>
+      <text class="node-label" x="130" y="218" text-anchor="middle">候选 pocket</text>
+      <text class="node-sub" x="130" y="235" text-anchor="middle">apo / AlphaFold 生成，top-K</text>
+
+      <rect x="30" y="292" width="200" height="52" rx="8" fill="#b5812f"/>
+      <text class="node-label" x="130" y="314" text-anchor="middle">配体 pose</text>
+      <text class="node-sub" x="130" y="331" text-anchor="middle">仅有 RMSD 标签的样本</text>
+    </g>
+
+    <!-- model nodes -->
+    <g>
+      <rect x="360" y="150" width="250" height="78" rx="10" fill="#1f6f6a"/>
+      <text class="node-label" x="485" y="178" text-anchor="middle">主创新一</text>
+      <text class="node-sub" x="485" y="198" text-anchor="middle">Pocket-aware DTI</text>
+      <text class="node-sub" x="485" y="214" text-anchor="middle">pocket 进入交互表征</text>
+
+      <rect x="360" y="292" width="250" height="70" rx="10" fill="#b5812f"/>
+      <text class="node-label" x="485" y="318" text-anchor="middle">辅助创新</text>
+      <text class="node-sub" x="485" y="338" text-anchor="middle">Pose confidence · 软调制</text>
+      <text class="node-sub" x="485" y="354" text-anchor="middle">置信度为 0 时路径保持</text>
+
+      <rect x="360" y="430" width="250" height="78" rx="10" fill="#1f6f6a"/>
+      <text class="node-label" x="485" y="458" text-anchor="middle">主创新二</text>
+      <text class="node-sub" x="485" y="478" text-anchor="middle">Pocket-to-function 传播</text>
+      <text class="node-sub" x="485" y="494" text-anchor="middle">残基图上预测功能位点</text>
+    </g>
+
+    <!-- loss nodes -->
+    <g>
+      <rect x="790" y="150" width="210" height="78" rx="10" fill="#7d4e7a"/>
+      <text class="node-label" x="895" y="180" text-anchor="middle">L_DTI + L_affinity</text>
+      <text class="node-sub" x="895" y="200" text-anchor="middle">主损失</text>
+      <text class="node-sub" x="895" y="216" text-anchor="middle">endpoint 分开，不混合</text>
+
+      <rect x="790" y="292" width="210" height="70" rx="10" fill="#7d4e7a"/>
+      <text class="node-label" x="895" y="322" text-anchor="middle">L_pose_rank</text>
+      <text class="node-sub" x="895" y="342" text-anchor="middle">同 pocket 内按 RMSD 排序</text>
+
+      <rect x="790" y="430" width="210" height="78" rx="10" fill="#7d4e7a"/>
+      <text class="node-label" x="895" y="460" text-anchor="middle">L_function</text>
+      <text class="node-sub" x="895" y="480" text-anchor="middle">残基级功能位点</text>
+      <text class="node-sub" x="895" y="496" text-anchor="middle">注释只作标签，不作输入</text>
+    </g>
+
+    <!-- edges: data to model -->
+    <g fill="none" stroke="#9aa0ab" stroke-width="1.5" marker-end="url(#arrow)">
+      <path d="M230 78 H300 V176 H360"/>
+      <path d="M230 150 H300 V176"/>
+      <path d="M230 222 H300 V196"/>
+      <path d="M230 318 H360"/>
+      <path d="M230 176 H300"/>
+    </g>
+    <!-- edges: model to model -->
+    <g fill="none" stroke="#b5812f" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)">
+      <path d="M485 362 V428"/>
+    </g>
+    <g fill="none" stroke="#1f6f6a" stroke-width="1.5" marker-end="url(#arrow)">
+      <path d="M485 228 V292"/>
+      <path d="M610 189 H700 V470 H610"/>
+    </g>
+    <!-- edges: model to loss -->
+    <g fill="none" stroke="#9aa0ab" stroke-width="1.5" marker-end="url(#arrow)">
+      <path d="M610 189 H790"/>
+      <path d="M610 327 H790"/>
+      <path d="M610 469 H790"/>
+    </g>
+
+    <text class="edge-label" x="500" y="268">pocket 权重</text>
+    <text class="edge-label" x="500" y="404">软调制</text>
+    <text class="edge-label" x="640" y="330">交互状态</text>
+  </svg>
+
+  <h2>三个创新点</h2>
+  <div class="grid">
+    <div class="card">
+      <span class="tag primary">主创新一</span>
+      <h3>Pocket-aware DTI</h3>
+      <p>候选 pocket 直接参与交互表征的形成，而不只是事后解释。推理时 pocket 由 apo 或预测结构生成，不使用测试配体坐标。</p>
+      <p class="feeds">输入：SMILES、蛋白序列与结构、候选 pocket<br>评测：cold-target / cold-pocket / cold-both，同时报 pocket 定位</p>
+    </div>
+    <div class="card">
+      <span class="tag primary">主创新二</span>
+      <h3>Pocket-to-function 传播</h3>
+      <p>从结合 pocket 出发，在残基图上预测远端的功能、变构与疾病相关区域。学的是预测性传播，不声称恢复真实能量路径。</p>
+      <p class="feeds">监督：UniProt 功能位点、BioLiP2 结合与催化残基<br>约束：功能注释只作标签，绝不作为输入</p>
+    </div>
+    <div class="card">
+      <span class="tag aux">辅助创新</span>
+      <h3>Pose confidence</h3>
+      <p>对同一配体、同一 pocket 的多个 pose 估计置信度并重排。它只调制交互状态的强度，置信度为零时 DTI 路径原样通过。</p>
+      <p class="feeds">监督：PDBbind、CrossDocked2020 的 RMSD-to-crystal<br>无标签的样本该损失贡献精确为 0</p>
+    </div>
+  </div>
+
+  <h2>数据特征与标签</h2>
+  <table>
+    <thead>
+      <tr><th>来源</th><th>提供的特征</th><th>允许监督的损失</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>BindingDB / ChEMBL</td><td>SMILES、靶点、亲和力</td><td><code>L_DTI</code> <code>L_affinity</code></td></tr>
+      <tr><td>PDBbind / BioLiP2</td><td>复合物结构、接触残基</td><td><code>L_pocket</code> <code>L_pose_rank</code></td></tr>
+      <tr><td>CrossDocked2020 / CASF</td><td>pose 与 RMSD-to-crystal</td><td><code>L_pose_rank</code></td></tr>
+      <tr><td>UniProt</td><td>结合、活性、功能、跨膜位点</td><td><code>L_function</code></td></tr>
+      <tr><td>Guide to Pharmacology</td><td>激动、拮抗、机制注释</td><td><code>L_effect</code> <code>L_mechanism</code></td></tr>
+      <tr><td>ASD</td><td>变构位点</td><td><code>L_allosteric</code></td></tr>
+    </tbody>
+  </table>
+  <p class="note">各来源不拼成一张宽表。一条样本只参与它真实携带的标签对应的损失，缺失注释保持缺失，不记为负样本。Kd、Ki、IC50、EC50 按 endpoint 分开回归。PIEZO1/2 及其同源蛋白排除出训练集，只作外部 case study。</p>
+
+  <h2>训练课程</h2>
+  <div class="stages">
+    <div class="stage">
+      <div class="idx">01</div>
+      <h3>pocket</h3>
+      <ul><li>L_pocket</li><li>L_pose_rank</li><li>L_allosteric</li></ul>
+    </div>
+    <div class="stage">
+      <div class="idx">02</div>
+      <h3>dti</h3>
+      <ul><li>L_DTI</li><li>L_affinity</li><li>L_pocket</li></ul>
+    </div>
+    <div class="stage">
+      <div class="idx">03</div>
+      <h3>propagation</h3>
+      <ul><li>L_function</li><li>L_effect</li></ul>
+    </div>
+    <div class="stage">
+      <div class="idx">04</div>
+      <h3>pharmacology</h3>
+      <ul><li>L_effect</li><li>L_mechanism</li></ul>
+    </div>
+    <div class="stage">
+      <div class="idx">05</div>
+      <h3>joint</h3>
+      <ul><li>全部损失</li><li>几何编码器降学习率</li></ul>
+    </div>
+  </div>
+  <p class="note">每个阶段从上一个阶段的最优检查点继续，只打开该阶段有监督的损失。joint 阶段对几何编码器使用更低的学习率。</p>
+</main>
+</body>
+</html>
