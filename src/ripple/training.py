@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 
 from src.ripple.model import RIPPLEDTI, RIPPLEOutput
+from src.ripple.structure_response import MultiStateOutput, RIPPLEMultiState
 
 
 class TrainingStage(str, Enum):
@@ -14,6 +15,8 @@ class TrainingStage(str, Enum):
     DTI = "dti"
     PROPAGATION = "propagation"
     PHARMACOLOGY = "pharmacology"
+    STRUCTURE = "structure"
+    CHANNEL = "channel"
     JOINT = "joint"
 
 
@@ -35,6 +38,14 @@ class RIPPLELabels:
     pose_mask: Optional[Tensor] = None
     allosteric_pocket: Optional[Tensor] = None
     allosteric_pocket_mask: Optional[Tensor] = None
+    geometry_snapshot: Optional[Tensor] = None
+    geometry_snapshot_mask: Optional[Tensor] = None
+    geometry_response: Optional[Tensor] = None
+    geometry_response_mask: Optional[Tensor] = None
+    gating: Optional[Tensor] = None
+    gating_mask: Optional[Tensor] = None
+    state_preference: Optional[Tensor] = None
+    state_preference_mask: Optional[Tensor] = None
 
 
 @dataclass
@@ -48,6 +59,10 @@ class RIPPLELossWeights:
     pose_rank: float = 0.1
     allosteric_pocket: float = 0.1
     nonbinder_delta: float = 0.01
+    geometry_snapshot: float = 0.25
+    geometry_response: float = 0.5
+    gating: float = 0.5
+    state_preference: float = 0.5
 
 
 @dataclass
@@ -150,6 +165,7 @@ class RIPPLEMultiTaskLoss(nn.Module):
         self,
         output: RIPPLEOutput,
         labels: RIPPLELabels,
+        state_output: Optional[MultiStateOutput] = None,
     ) -> RIPPLELossOutput:
         predictions = output.predictions
         raw: Dict[str, Tensor] = {}
@@ -275,6 +291,48 @@ class RIPPLEMultiTaskLoss(nn.Module):
             raw["nonbinder_delta"] = _masked_mean(delta_norm, reliable)
             counts["nonbinder_delta"] = int(reliable.sum().item())
 
+        for name, prediction_name in (
+            ("geometry_snapshot", "geometry_snapshot"),
+            ("geometry_response", "geometry_delta"),
+        ):
+            target = getattr(labels, name)
+            mask = getattr(labels, name + "_mask")
+            if target is None:
+                raw[name], counts[name] = interaction_logit.sum() * 0.0, 0
+                continue
+            if mask is None:
+                raise ValueError(f"{name} requires an explicit evidence mask")
+            if prediction_name not in predictions:
+                raise ValueError(f"{name} requires reference geometry queries")
+            predicted = predictions[prediction_name]
+            target = target.to(predicted)
+            if target.shape != predicted.shape or mask.shape != target.shape:
+                raise ValueError(f"{name} label shape must match geometry predictions")
+            valid = _resolve_mask(target, mask) & predictions["geometry_valid_mask"]
+            if name == "geometry_snapshot":
+                valid = valid & (target >= 0)
+            loss = F.smooth_l1_loss(predicted, target.nan_to_num(), reduction="none")
+            raw[name] = _masked_mean(loss, valid)
+            counts[name] = int(valid.sum().item())
+
+        if labels.gating is not None and labels.gating_mask is None:
+            raise ValueError("gating requires an explicit intervention evidence mask")
+        raw["gating"], counts["gating"] = self._classification_loss(
+            predictions["gating_logits"], labels.gating, labels.gating_mask,
+        )
+        if labels.state_preference is None:
+            raw["state_preference"], counts["state_preference"] = interaction_logit.sum() * 0.0, 0
+        else:
+            if labels.state_preference_mask is None or state_output is None:
+                raise ValueError("state preference requires multistate output and an evidence mask")
+            preference_mask = labels.state_preference_mask.to(
+                device=state_output.valid_mask.device, dtype=torch.bool,
+            ) & (state_output.valid_mask.sum(-1) >= 2)
+            raw["state_preference"], counts["state_preference"] = self._index_nll(
+                state_output.preference_probability, labels.state_preference,
+                preference_mask, state_output.valid_mask,
+            )
+
         weighted = {
             name: value * float(getattr(self.weights, name))
             for name, value in raw.items()
@@ -321,6 +379,12 @@ _STAGE_MODULES = {
         "task_heads.effect_head",
         "task_heads.mechanism_head",
     },
+    TrainingStage.STRUCTURE: {
+        "residue_encoder", "protein_fusion", "structure_response.snapshot_readout",
+    },
+    TrainingStage.CHANNEL: {
+        "source_fusion", "propagation", "structure_response.readout", "gating_head",
+    },
     TrainingStage.JOINT: {""},
 }
 
@@ -333,10 +397,15 @@ def _matches_prefix(parameter_name: str, prefixes: Set[str]) -> bool:
 
 
 def configure_training_stage(
-    model: RIPPLEDTI, stage: Union[TrainingStage, str]
+    model: Union[RIPPLEDTI, RIPPLEMultiState], stage: Union[TrainingStage, str]
 ) -> None:
     """Freeze modules according to the declared curriculum stage."""
     stage = TrainingStage(stage)
+    if isinstance(model, RIPPLEMultiState):
+        configure_training_stage(model.core, stage)
+        for parameter in model.state_score.parameters():
+            parameter.requires_grad = stage in {TrainingStage.CHANNEL, TrainingStage.JOINT}
+        return
     prefixes = _STAGE_MODULES[stage]
     for name, parameter in model.named_parameters():
         parameter.requires_grad = _matches_prefix(name, prefixes)
@@ -351,6 +420,10 @@ def stage_loss_weights(stage: Union[TrainingStage, str]) -> RIPPLELossWeights:
         TrainingStage.DTI: {"interaction", "affinity", "native_pocket"},
         TrainingStage.PROPAGATION: {"function", "effect", "nonbinder_delta"},
         TrainingStage.PHARMACOLOGY: {"effect", "mechanism", "nonbinder_delta"},
+        TrainingStage.STRUCTURE: {"geometry_snapshot"},
+        TrainingStage.CHANNEL: {
+            "geometry_response", "gating", "state_preference", "nonbinder_delta",
+        },
         TrainingStage.JOINT: {field.name for field in fields(RIPPLELossWeights)},
     }[stage]
     for field in fields(weights):
@@ -360,7 +433,7 @@ def stage_loss_weights(stage: Union[TrainingStage, str]) -> RIPPLELossWeights:
 
 
 def build_optimizer_param_groups(
-    model: RIPPLEDTI,
+    model: Union[RIPPLEDTI, RIPPLEMultiState],
     base_lr: float,
     weight_decay: float,
     backbone_lr_multiplier: float = 0.2,
@@ -372,7 +445,7 @@ def build_optimizer_param_groups(
     for name, parameter in model.named_parameters():
         if not parameter.requires_grad:
             continue
-        if name.startswith(backbone_prefixes):
+        if name.removeprefix("core.").startswith(backbone_prefixes):
             backbone.append(parameter)
         else:
             task_specific.append(parameter)

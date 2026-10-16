@@ -218,13 +218,14 @@ class PocketConformerMatcher(nn.Module):
         # pocket-only context, so conditioning degrades instead of vanishing.
         pose_confidence = torch.sigmoid(self.confidence_head(pair_context)).squeeze(-1)
         pose_confidence = pose_confidence * pose_available.to(pose_confidence.dtype)
+        fallback_pocket = torch.sum(pocket_weight.unsqueeze(-1) * pocket_global, dim=1)
         pocket_only_context = self.pair_context_projection(
             torch.cat(
                 [
-                    selected_pocket,
-                    selected_pocket.new_zeros(batch_size, dim),
-                    selected_pocket.new_zeros(batch_size, dim),
-                    selected_pocket.new_zeros(batch_size, dim),
+                    fallback_pocket,
+                    chemical_context,
+                    fallback_pocket * chemical_context,
+                    torch.abs(fallback_pocket - chemical_context),
                 ],
                 dim=-1,
             )

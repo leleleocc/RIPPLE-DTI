@@ -1,0 +1,5 @@
+# Data-only environment; model/training dependencies are not required.
+pyarrow==26.0.0
+rdkit==2026.9.1
+numpy==2.5.4
+gemmi==0.7.5

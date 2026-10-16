@@ -1,7 +1,7 @@
 import torch
 
+from src.ripple import RIPPLEDTI, RIPPLEBatch
 from src.ripple.propagation import DifferentialResiduePropagation
-from src.ripple import RIPPLEBatch, RIPPLEDTI
 
 
 def make_batch(batch_size=2, dim=16, edge_dim=3):
@@ -217,6 +217,7 @@ def test_missing_poses_keep_the_dti_path_finite():
     batch = make_batch()
     batch.conformer_mask.zero_()
     batch.atom_mask.zero_()
+    batch.protein_sequence_tokens = None
     output = model(batch)
 
     assert torch.isfinite(output.predictions["interaction_logit"]).all()

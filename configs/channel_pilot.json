@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "scope": "Curated multistate pilot; not a census of all ion channels",
+  "external_accessions": ["Q92508", "Q9H5I1"],
+  "effect_type_map": {"Activator": 0, "Agonist": 0, "Antagonist": 1, "Inhibitor": 1, "Channel blocker": 1},
+  "mechanism_type_map": {"Inhibitor": 0, "Channel blocker": 1, "Allosteric modulator": 3, "Agonist": 4},
+  "agonist_actions": ["Agonist", "Full agonist"],
+  "small_molecule_types": ["Synthetic organic", "Natural product", "Metabolite"],
+  "families": [
+    {"family": "TRPV1", "accessions": ["O35433", "Q8NER1"], "gene_symbols": ["TRPV1", "Trpv1"]},
+    {"family": "P2X3", "accessions": ["P56373"], "gene_symbols": ["P2RX3", "P2rx3"]},
+    {"family": "GLRA1", "accessions": ["O93430", "P23415"], "gene_symbols": ["GLRA1", "Glra1", "glra1"]}
+  ],
+  "structures": [
+    {"pdb_id": "3J5P", "family": "TRPV1", "uniprot_id": "O35433", "state": "closed", "ligands": [], "assembly_id": "1", "expected_subunits": 4, "doi": "10.1038/nature12822", "pmid": "24305160"},
+    {"pdb_id": "3J5Q", "family": "TRPV1", "uniprot_id": "O35433", "state": "open", "ligands": ["resiniferatoxin", "DkTx"], "assembly_id": "1", "expected_subunits": 4, "doi": "10.1038/nature12823", "pmid": "24305161"},
+    {"pdb_id": "3J5R", "family": "TRPV1", "uniprot_id": "O35433", "state": "partially_activated", "ligands": ["capsaicin"], "assembly_id": "1", "expected_subunits": 4, "doi": "10.1038/nature12823", "pmid": "24305161"},
+    {"pdb_id": "5SVJ", "family": "P2X3", "uniprot_id": "P56373", "state": "closed", "ligands": [], "assembly_id": "1", "expected_subunits": 3, "doi": "10.1038/nature19367", "pmid": "27626375"},
+    {"pdb_id": "5SVK", "family": "P2X3", "uniprot_id": "P56373", "state": "open", "ligands": ["ATP"], "assembly_id": "1", "expected_subunits": 3, "doi": "10.1038/nature19367", "pmid": "27626375"},
+    {"pdb_id": "5SVL", "family": "P2X3", "uniprot_id": "P56373", "state": "desensitized", "ligands": ["ATP"], "assembly_id": "1", "expected_subunits": 3, "doi": "10.1038/nature19367", "pmid": "27626375"},
+    {"pdb_id": "3JAD", "family": "GLRA1", "uniprot_id": "O93430", "state": "closed", "ligands": ["strychnine"], "assembly_id": "1", "expected_subunits": 5, "doi": "10.1038/nature14853", "pmid": "26344198"},
+    {"pdb_id": "3JAE", "family": "GLRA1", "uniprot_id": "O93430", "state": "open", "ligands": ["glycine"], "assembly_id": "1", "expected_subunits": 5, "doi": "10.1038/nature14853", "pmid": "26344198"}
+  ],
+  "landmarks": {
+    "TRPV1": [{"auth_seq_id": 679, "residue_name": "ILE", "name": "lower_gate_I679"}, {"auth_seq_id": 643, "residue_name": "GLY", "name": "selectivity_filter_G643"}],
+    "P2X3": [{"auth_seq_id": 323, "residue_name": "ILE", "name": "TM2_I323"}, {"auth_seq_id": 334, "residue_name": "VAL", "name": "TM2_V334"}],
+    "GLRA1": [{"auth_seq_id": 277, "residue_name": "LEU", "name": "M2_L277_9prime"}, {"auth_seq_id": 266, "residue_name": "PRO", "name": "M2_P266_minus2prime"}]
+  },
+  "pairs": [
+    {"reference": "3J5P", "target": "3J5Q", "reason": "RTX and DkTx co-treatment; no single-ligand causal label"},
+    {"reference": "3J5P", "target": "3J5R", "reason": "Cross-sectional capsaicin-associated structural comparison"},
+    {"reference": "5SVJ", "target": "5SVK", "reason": "Construct mutations must match before response supervision"},
+    {"reference": "5SVK", "target": "5SVL", "reason": "ATP present in both; desensitization comparison is not ligand addition"},
+    {"reference": "3JAD", "target": "3JAE", "reason": "Strychnine versus glycine; ligand replacement, not apo-to-holo"}
+  ]
+}

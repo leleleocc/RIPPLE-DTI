@@ -11,9 +11,17 @@ Two primary contributions and one auxiliary module:
 
 :class:`RIPPLEDTI` assembles them and :class:`RIPPLEMultiTaskLoss` supervises
 each from its own label mask.
+
+The ion-channel extension adds invariant geometry targets, ligand-conditioned
+structural response, and shared-weight comparison of the same protein's states.
 """
 
-from src.ripple.model import RIPPLEBatch, RIPPLEDTI, RIPPLEOutput
+from src.ripple.model import RIPPLEDTI, RIPPLEBatch, RIPPLEOutput
+from src.ripple.structure_response import (
+    GeometryQueries,
+    MultiStateOutput,
+    RIPPLEMultiState,
+)
 from src.ripple.training import (
     RIPPLELabels,
     RIPPLELossWeights,
@@ -35,4 +43,7 @@ __all__ = [
     "build_optimizer_param_groups",
     "configure_training_stage",
     "stage_loss_weights",
+    "GeometryQueries",
+    "RIPPLEMultiState",
+    "MultiStateOutput",
 ]

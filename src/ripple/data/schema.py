@@ -33,6 +33,10 @@ class SourceTable:
     effect: bool = False
     mechanism: bool = False
     allosteric: bool = False
+    geometry_snapshot: bool = False
+    geometry_response: bool = False
+    gating: bool = False
+    state_preference: bool = False
 
 
 # What each upstream database is allowed to supervise. A source not listed here
@@ -47,6 +51,10 @@ CROSSDOCKED = SourceTable("crossdocked", pose=True)
 CASF = SourceTable("casf", pose=True)
 GTOPHARM = SourceTable("gtopharm", effect=True, mechanism=True)
 ASD = SourceTable("asd", allosteric=True)
+CHANNEL_STRUCTURES = SourceTable("channel_structures", geometry_snapshot=True)
+# These sources require separately curated intervention/state-specific evidence.
+CHANNEL_INTERVENTIONS = SourceTable("channel_interventions", geometry_response=True, gating=True)
+STATE_SPECIFIC_BINDING = SourceTable("state_specific_binding", state_preference=True)
 
 
 @dataclass
@@ -61,6 +69,10 @@ class LabelMasks:
     effect: Optional[bool] = None
     mechanism: Optional[bool] = None
     allosteric: Optional[bool] = None
+    geometry_snapshot: Optional[bool] = None
+    geometry_response: Optional[bool] = None
+    gating: Optional[bool] = None
+    state_preference: Optional[bool] = None
 
     def allows(self, source: SourceTable, label: str) -> bool:
         """A label counts only when both the source and the sample carry it."""

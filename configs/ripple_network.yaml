@@ -29,7 +29,8 @@ DATA:
   MAX_POCKET_RESIDUES: 96
 
 TRAINING:
-  # pocket -> dti -> propagation -> pharmacology -> joint
+  # pocket -> dti -> propagation -> pharmacology -> structure -> channel -> joint
+  # Structure: observed geometry. Channel: intervention-supported response only.
   BACKBONE_LR_MULTIPLIER: 0.2
   POSE_GOOD_RMSD: 2.0
   LOSS_WEIGHTS:
@@ -42,3 +43,7 @@ TRAINING:
     POSE_RANK: 0.1
     ALLOSTERIC_POCKET: 0.1
     NONBINDER_DELTA: 0.01
+    GEOMETRY_SNAPSHOT: 0.25
+    GEOMETRY_RESPONSE: 0.5
+    GATING: 0.5
+    STATE_PREFERENCE: 0.5

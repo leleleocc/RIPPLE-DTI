@@ -1,18 +1,9 @@
 from dataclasses import dataclass
 from typing import Dict, Optional
 
-from torch import Tensor, nn
+from torch import Tensor, cat, nn
 
 from src.ripple.conformer_encoder import ConformerEncoding, MultiConformerEncoder
-from src.ripple.pose_confidence import (
-    PocketConformerMatch,
-    PocketConformerMatcher,
-)
-from src.ripple.pocket_encoder import PocketEncoding, ResiduePocketEncoder
-from src.ripple.propagation import (
-    DifferentialResiduePropagation,
-    PropagationOutput,
-)
 from src.ripple.interaction import (
     DrugModalFusion,
     InteractionEncoding,
@@ -21,6 +12,16 @@ from src.ripple.interaction import (
     PocketConditionedBiIntention,
     ProteinStructureFusion,
 )
+from src.ripple.pocket_encoder import PocketEncoding, ResiduePocketEncoder
+from src.ripple.pose_confidence import (
+    PocketConformerMatch,
+    PocketConformerMatcher,
+)
+from src.ripple.propagation import (
+    DifferentialResiduePropagation,
+    PropagationOutput,
+)
+from src.ripple.structure_response import GeometryQueries, StructureResponseHead
 from src.ripple.task_heads import RIPPLETaskHeads
 
 
@@ -48,6 +49,7 @@ class RIPPLEBatch:
     protein_sequence_tokens: Optional[Tensor] = None
     function_mask: Optional[Tensor] = None
     endpoint_type: Optional[Tensor] = None
+    geometry_queries: Optional[GeometryQueries] = None
 
 
 @dataclass
@@ -155,6 +157,8 @@ class RIPPLEDTI(nn.Module):
             dropout=dropout,
             local_gate_bias=local_gate_bias,
         )
+        self.structure_response = StructureResponseHead(dim, dropout)
+        self.gating_head = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, 3))
 
     def forward(self, batch: RIPPLEBatch) -> RIPPLEOutput:
         conformers = self.conformer_encoder(
@@ -243,6 +247,18 @@ class RIPPLEDTI(nn.Module):
             endpoint_type=batch.endpoint_type,
         )
         predictions["joint_pocket_conformer_logits"] = match.joint_logits
+        # Direction classes: promotes opening, promotes closing, no gating change.
+        # Pore blockade and generic inhibition are not mapped into these classes.
+        predictions["gating_logits"] = self.gating_head(
+            cat([propagation.function_state, chemical_context], dim=-1)
+        )
+        if batch.geometry_queries is not None:
+            predictions.update(
+                self.structure_response(
+                    apo_tokens, propagation.delta_tokens, chemical_context,
+                    batch.residue_coords, pockets.residue_mask, batch.geometry_queries,
+                )
+            )
 
         return RIPPLEOutput(
             predictions=predictions,
