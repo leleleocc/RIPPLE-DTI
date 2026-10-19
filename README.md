@@ -14,10 +14,9 @@ independently evaluated channel-gating predictor yet.
 
 ## Start Here
 
-Read [the project context](docs/design.md) first. It explains the research
-direction, the five base data sources, additional channel data, shared terminology
-and the boundary between implemented code and demonstrated capability.
-The [documentation map](docs/README.md) provides the remaining reading order.
+Read the [model guide](docs/MODEL.md) for inputs, outputs and the two-stage plan.
+The [documentation map](docs/README.md) links the three consolidated guides:
+data, model, and training strategy with scripts.
 
 | Area | Actual status as of 2026-10-16 |
 |---|---|
@@ -30,7 +29,7 @@ The [documentation map](docs/README.md) provides the remaining reading order.
 The local check learned to reconstruct current geometry. It did not train
 ligand-induced changes or channel opening/closing. A separate full-model
 forward/backward check performed no optimizer update. See the
-[channel record](docs/CHANNEL_EXTENSION.md) for sources and exact run details.
+[data guide](docs/DATA.md) for sources and historical run details.
 
 ## Contributions
 
@@ -83,18 +82,16 @@ uv pip install --python .venv/bin/python -r requirements-data.txt
 ```
 
 The full-source audit and selected-complex residue verification write
-`data/processed/DATA_REPORT.md`. See [DATA_PREPARATION.md](docs/DATA_PREPARATION.md)
+`data/processed/DATA_REPORT.md`. See the [data guide](docs/DATA.md)
 for the output tables, filters, and remaining training prerequisites.
 
 ## Training
 
-The curriculum adds `structure` and `channel` stages for the ion-channel extension.
-Each stage enables only the losses that have supervision, and a sample
-contributes to a loss only when both its source and its record carry that label.
-The full cache builder and training loop are still stubs. Stage policies in
-`src/ripple/training.py` are implemented, but the production entry point has not
-integrated the channel stages or run a complete curriculum. Follow the
-[implementation checklist](docs/IMPLEMENTATION_PLAN.md) before formal training.
+The plan is base pretraining followed by channel enhancement/inhibition tuning,
+with current-geometry reconstruction and base-task replay as auxiliary tasks.
+The full cache builder and training loop are still stubs, and the existing
+internal stage policies do not yet implement this plan. Follow the
+[training strategy and scripts](docs/TRAINING.md) before formal training.
 
 ## Ion-Channel Pilot
 
@@ -111,8 +108,8 @@ uv pip install --python .venv/bin/python -r requirements-data.txt torch einops
 The first audit contains eight structures, 16 observed geometry values and 103
 pharmacology records. Structural differences are not automatically used as
 drug-induced response or state-preference labels. See
-[CHANNEL_EXTENSION.md](docs/CHANNEL_EXTENSION.md) for verified counts, model
-contracts, real-data smoke results and the remaining training prerequisites.
+[data guide](docs/DATA.md) for verified counts and historical smoke results;
+the [training guide](docs/TRAINING.md) lists the remaining prerequisites.
 
 ## Tests
 

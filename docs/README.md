@@ -1,50 +1,15 @@
-# Documentation Map
+# RIPPLE-DTI 文档
 
-Updated: 2026-10-16. Start with [design.md](design.md) for the Chinese project
-context: the research question, accepted scope, data roles and actual progress.
+更新：2026-10-17。**基础预训练 → 通道专项微调 → 冻结模型用于 PIEZO1/2**。
 
-The current objective is small-molecule modulation of ion channels, extending
-the original DTI/pocket/residue framework to conformational and functional
-response. Explicit membrane modeling is deferred. There is no trained channel
-gating predictor or completed production training run yet.
-
-## Reading Order
-
-| Read | Document | Purpose |
-|---|---|---|
-| 1 | [Research context and design](design.md) | Why the objective changed, shared terminology, supervision boundaries and current status |
-| 2 | [Five-source audit](DATA_ALIGNMENT_RESULTS.md) | What is downloaded/aligned, what counts mean, and remaining coverage gaps |
-| 3 | [Channel extension](CHANNEL_EXTENSION.md) | Additional official sources, the 8 structures, geometry labels and Mac CPU smoke run |
-| 4 | [Network contract](NETWORK_MODULES.md) | Actual interfaces in `src/ripple/`, masks, outputs and implemented stage policies |
-| 5 | [Implementation plan](IMPLEMENTATION_PLAN.md) | Completed work, open decisions and concrete next deliverables |
-| As needed | [Data preparation](DATA_PREPARATION.md) | Commands, staging tables and residue-mapping rules |
-
-## Status Vocabulary
-
-| Wording | Required evidence |
+| 文档 | 内容 |
 |---|---|
-| Downloaded | Local raw files with identifiable sources |
-| Aligned | Checked identities/residue mappings within the stated subset |
-| Implemented | Model/data/loss code exists; this alone says nothing about prediction quality |
-| Smoke checked | Small execution or gradient check, with its actual configuration stated |
-| Trained and evaluated | A defined dataset/split, reproducible run, checkpoint and held-out metrics |
+| [数据](DATA.md) | 两阶段数据、实际候选量、首轮预算和划分规则 |
+| [模型](MODEL.md) | 输入输出、残基与三维结构、任务开关和代码边界 |
+| [训练策略与脚本](TRAINING.md) | 四卡训练安排、可运行命令、待完成工程和 PIEZO 交付 |
 
-The current geometry smoke run used a local Mac CPU, 8 structures and 64 updates
-of a small structure subgraph. It did not train ligand-induced response, gating
-or state preference. The full model also had one forward/backward check without
-an optimizer update. See the channel document before citing its training error.
+同一个模型先后训练两阶段，第二阶段内部交替执行药理、当前几何和基础回放任务。
 
-## Evidence And Local Files
+首轮规模：几十万基础记录、约千组通道药理、最多千个合格通道装配；最终数量以审核划分后的清单为准。
 
-Generated data and run artifacts are git-ignored and may be absent in a fresh
-checkout. Reproduction commands are in the corresponding data documents.
-
-- Five-source counts: `data/processed/alignment_summary.json` and `DATA_REPORT.md`.
-- Channel counts and provenance: `data/processed/channels/summary.json` and `provenance.json`.
-- Local smoke record: `outputs/channel_geometry_smoke/smoke_report.json`.
-- Source eligibility: `src/ripple/data/schema.py`.
-- Current source and batch interfaces: `src/ripple/model.py` and `training.py`.
-
-`overview.html` is a historical illustration of the base DTI design. Its scope
-does not include the ion-channel extension. The current design and network
-contract replace earlier hard-gating, conformer-label and path descriptions.
+当前为方案与工程准备阶段，正式训练尚未开始。历史小规模检查不代表已获得可用的 PIEZO 预测模型；原有基础数据仍在远端。

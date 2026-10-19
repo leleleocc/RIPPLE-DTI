@@ -1,0 +1,163 @@
+{
+  "format": "stage2_explanatory_demo_v1",
+  "purpose": "Show source evidence, model inputs and training targets separately.",
+  "is_training_cache": false,
+  "effect_encoding": {"activation": 0, "inhibition": 1},
+  "all_other_losses_disabled_unless_explicitly_enabled": true,
+  "model_predictions_available": false,
+  "sources": {
+    "pharmacology": {
+      "version": "GtoPdb 2026.3.1",
+      "release_date": "2026-10-12",
+      "url": "https://www.guidetopharmacology.org/DATA/interactions.csv",
+      "chemical_identity_url": "https://www.guidetopharmacology.org/DATA/ligands.csv",
+      "full_source_snapshot_retained": false,
+      "retained_evidence": "Selected source fields and PubMed IDs are embedded in pharmacology_samples; full census files were removed.",
+      "raw_interactions_sha256": "c1b81895f520bd2b29b5631224320da4047a7d175dc06ba2adcc60f1a9e1ffa1"
+    },
+    "reference_structure": {
+      "retrieved_date": "2026-10-17",
+      "url": "https://files.rcsb.org/download/3J5P-assembly1.cif",
+      "file": "assets/3J5P-assembly1.cif",
+      "sha256": "39d1a28c8ca2dd42838f563751b978146b46ed797e6164c937e64145154bcc2f",
+      "entry_metadata_url": "https://data.rcsb.org/rest/v1/core/entry/3J5P"
+    },
+    "canonical_sequence": {
+      "url": "https://rest.uniprot.org/uniprotkb/O35433.fasta",
+      "file": "assets/O35433.fasta",
+      "sha256": "3a7b5a0f26039aa34c49e8af1e41c22d8a3348bb1b565971510f00712ac972dc"
+    }
+  },
+  "shared_protein_input": {
+    "name": "TRPV1",
+    "species": "Rattus norvegicus",
+    "accession": "O35433",
+    "canonical_sequence_file": "assets/O35433.fasta",
+    "canonical_sequence_length": 838,
+    "sequence_preview_first_60": "MEQRASLDSEESESPPQENSCLDPPDRDPNCKPPPVKPHIFTTRSRTRLFGKGDSEEASP",
+    "reference_pdb": "3J5P",
+    "reference_assembly": "1",
+    "reference_structure_file": "assets/3J5P-assembly1.cif",
+    "reference_role": "Independent illustrative reference, not a structure paired with either pharmacology experiment.",
+    "author_chain_ids": ["B", "A", "C", "D"],
+    "author_to_label_chain": {"B": "A", "A": "B", "C": "C", "D": "D"},
+    "deposited_construct_sequence_length_per_chain": 598,
+    "deposited_construct_terminal_unknown_residues": 12,
+    "observed_ca_count_per_chain": 592,
+    "observed_ca_count_assembly": 2368,
+    "missing_ca_construct_label_positions_per_chain": [393, 394, 395, 396, 397, 587],
+    "full_sequence_structure_mapping_audited": false,
+    "candidate_pockets": null,
+    "feature_cache": null,
+    "split": null,
+    "pending": [
+      "Audit construct, sequence mapping, structure quality and pharmacology compatibility.",
+      "Standardize molecular identity and build molecular features/conformers.",
+      "Detect candidate pockets without experimental ligand coordinates.",
+      "Build per-residue features, graph edges and valid input masks.",
+      "Assign the audited protein group to a frozen split."
+    ]
+  },
+  "pharmacology_samples": [
+    {
+      "sample_id": "gtopdb_2486_507_Rat",
+      "source_record": {
+        "ligand_id": "2486",
+        "ligand_name": "capsaicin",
+        "target_id": "507",
+        "target_name": "TRPV1",
+        "species": "Rat",
+        "accession": "O35433",
+        "type": "Activator",
+        "action": "Agonist",
+        "pubmed_ids": ["9349813"],
+        "reported_numeric_endpoint": {"type": "pEC50", "value": 6.1}
+      },
+      "input": {
+        "drug_smiles": "COc1cc(CNC(=O)CCCC/C=C/C(C)C)ccc1O",
+        "protein_input_ref": "#/shared_protein_input"
+      },
+      "training_target": {"effect_name": "activation", "effect_class": 0},
+      "loss_enabled": {"effect": true, "geometry_snapshot": false, "affinity": false, "native_pocket": false},
+      "not_model_inputs": ["source_record.type", "source_record.action", "source_record.reported_numeric_endpoint", "training_target"],
+      "model_prediction": null
+    },
+    {
+      "sample_id": "gtopdb_2461_507_Rat",
+      "source_record": {
+        "ligand_id": "2461",
+        "ligand_name": "capsazepine",
+        "target_id": "507",
+        "target_name": "TRPV1",
+        "species": "Rat",
+        "accession": "O35433",
+        "type": "Channel blocker",
+        "action": "Antagonist",
+        "pubmed_ids": ["11226139"],
+        "reported_numeric_endpoint": {"type": "pIC50", "value": 6.7}
+      },
+      "input": {
+        "drug_smiles": "Clc1ccc(cc1)CCNC(=S)N1CCCc2c(C1)cc(O)c(c2)O",
+        "protein_input_ref": "#/shared_protein_input"
+      },
+      "training_target": {"effect_name": "inhibition", "effect_class": 1},
+      "loss_enabled": {"effect": true, "geometry_snapshot": false, "affinity": false, "native_pocket": false},
+      "not_model_inputs": ["source_record.type", "source_record.action", "source_record.reported_numeric_endpoint", "training_target"],
+      "model_prediction": null
+    }
+  ],
+  "geometry_sample": {
+    "sample_id": "3J5P_assembly1_current_geometry",
+    "input": {
+      "protein_input_ref": "#/shared_protein_input",
+      "drug": null,
+      "residue_preview_only": [
+        {"chain_auth": "B", "chain_label": "A", "auth_seq_id": 643, "label_seq_id": 510, "insertion_code": "", "name": "GLY", "atom": "CA", "xyz_angstrom": [-0.964, 3.656, -26.770], "coordinate_valid": true},
+        {"chain_auth": "B", "chain_label": "A", "auth_seq_id": 679, "label_seq_id": 546, "insertion_code": "", "name": "ILE", "atom": "CA", "xyz_angstrom": [-2.149, 4.685, -11.554], "coordinate_valid": true},
+        {"chain_auth": "A", "chain_label": "B", "auth_seq_id": 643, "label_seq_id": 510, "insertion_code": "", "name": "GLY", "atom": "CA", "xyz_angstrom": [-3.661, -0.958, -26.769], "coordinate_valid": true},
+        {"chain_auth": "A", "chain_label": "B", "auth_seq_id": 679, "label_seq_id": 546, "insertion_code": "", "name": "ILE", "atom": "CA", "xyz_angstrom": [-4.688, -2.141, -11.553], "coordinate_valid": true}
+      ],
+      "queries_using_author_numbering": [
+        {"left": ["B", 679, ""], "right": ["A", 679, ""], "atom": "CA"},
+        {"left": ["B", 643, ""], "right": ["A", 643, ""], "atom": "CA"},
+        {"left": ["B", 643, ""], "right": ["B", 679, ""], "atom": "CA"}
+      ]
+    },
+    "training_target": {
+      "geometry_snapshot_angstrom": [7.282911368402062, 5.344418209683819, 15.296722590149825],
+      "label_mask": [true, true, true],
+      "derived_from": "Euclidean distance between deposited CA coordinates in this same reference assembly."
+    },
+    "loss_enabled": {"effect": false, "geometry_snapshot": true, "affinity": false, "native_pocket": false},
+    "model_prediction": null,
+    "notes": [
+      "The four preview residues do not replace the full assembly input.",
+      "Author residue numbers are not zero-based tensor indices or automatically canonical sequence positions.",
+      "Resolve queries to graph indices only after retaining chain and residue mappings.",
+      "Each query illustrates one pair; this is three targets from one structure, not three structures.",
+      "Distances are not pore diameters, drug-induced changes, or channel opening labels."
+    ]
+  },
+  "replay_format_example": {
+    "sample_id": "SYNTHETIC_FORMAT_ONLY",
+    "is_synthetic": true,
+    "reason": "Base training records are remote; the numeric value below is illustrative, not an experimental claim.",
+    "input": {
+      "drug_smiles": "<from the original stage-one train record>",
+      "protein_sequence": "<from the original stage-one train record>",
+      "reference_structure_file": "<from the original stage-one train record>",
+      "endpoint": "Kd"
+    },
+    "training_target": {
+      "example_reported_value": 10,
+      "example_reported_unit": "nM",
+      "example_value_in_molar": 1e-8,
+      "example_pKd": 8.0,
+      "example_transform": "-log10(Kd in mol/L); keep the endpoint type and the actual stage-one transform."
+    },
+    "loss_enabled": {"effect": false, "geometry_snapshot": false, "affinity": true, "native_pocket": false},
+    "model_prediction": null,
+    "required_real_source_split": "stage1_train",
+    "must_not_be_used_for_training": true
+  }
+}

@@ -4,6 +4,10 @@ data/processed/
 data/benchmarks/
 data/external/
 data/cache/
+data/planning/gtopdb/sources/
+data/planning/gtopdb/eligible_effect_records.csv
+data/planning/gtopdb/eligible_effect_groups.json
+data/planning/gtopdb/first_run_effect_groups.json
 model/
 cache/
 outputs/
