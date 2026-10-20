@@ -1,4 +1,5 @@
 torch
+PyYAML
 dgl
 dgllife
 einops

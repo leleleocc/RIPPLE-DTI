@@ -15,7 +15,9 @@ ENDPOINT_IC50 = 2
 ENDPOINT_EC50 = 3
 ENDPOINT_UNKNOWN = 4
 
-# effect: agonist/activator, antagonist/inhibitor, other.
+# Unknown effect direction is missing supervision, never a third class.
+EFFECT_ACTIVATION = 0
+EFFECT_INHIBITION = 1
 # mechanism: inhibitor, blocker, opener, modulator, agonist, other.
 # Mappings from Guide to Pharmacology and ChEMBL live in configs, not here.
 
@@ -56,6 +58,11 @@ CHANNEL_STRUCTURES = SourceTable("channel_structures", geometry_snapshot=True)
 CHANNEL_INTERVENTIONS = SourceTable("channel_interventions", geometry_response=True, gating=True)
 STATE_SPECIFIC_BINDING = SourceTable("state_specific_binding", state_preference=True)
 
+SOURCES = {source.name: source for source in (
+    BINDINGDB, CHEMBL, BIOSNAP, PDBBIND, BIOLIP2, UNIPROT, CROSSDOCKED,
+    CASF, GTOPHARM, ASD, CHANNEL_STRUCTURES, CHANNEL_INTERVENTIONS, STATE_SPECIFIC_BINDING,
+)}
+
 
 @dataclass
 class LabelMasks:
@@ -73,6 +80,10 @@ class LabelMasks:
     geometry_response: Optional[bool] = None
     gating: Optional[bool] = None
     state_preference: Optional[bool] = None
+
+    def __post_init__(self):
+        if any(value is not None and not isinstance(value, bool) for value in vars(self).values()):
+            raise TypeError("Label permissions must be booleans or None")
 
     def allows(self, source: SourceTable, label: str) -> bool:
         """A label counts only when both the source and the sample carry it."""

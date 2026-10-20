@@ -6,11 +6,15 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from src.ripple.model import RIPPLEDTI, RIPPLEOutput
+from src.ripple.model import GeometryOutput, RIPPLEDTI, RIPPLEOutput
 from src.ripple.structure_response import MultiStateOutput, RIPPLEMultiState
 
 
 class TrainingStage(str, Enum):
+    FOUNDATION = "foundation"
+    EFFECT_WARMUP = "effect_warmup"
+    CHANNEL_FINETUNE = "channel_finetune"
+    # Historical experiments remain available only when explicitly selected.
     POCKET = "pocket"
     DTI = "dti"
     PROPAGATION = "propagation"
@@ -86,7 +90,7 @@ def _resolve_mask(target: Tensor, mask: Optional[Tensor]) -> Tensor:
 def _masked_mean(values: Tensor, mask: Tensor) -> Tensor:
     mask = mask.to(device=values.device, dtype=torch.bool)
     if not mask.any():
-        return values.sum() * 0.0
+        return values[mask].sum()
     return values[mask].mean()
 
 
@@ -163,13 +167,38 @@ class RIPPLEMultiTaskLoss(nn.Module):
 
     def forward(
         self,
-        output: RIPPLEOutput,
+        output: RIPPLEOutput | GeometryOutput,
         labels: RIPPLELabels,
         state_output: Optional[MultiStateOutput] = None,
     ) -> RIPPLELossOutput:
         predictions = output.predictions
         raw: Dict[str, Tensor] = {}
         counts: Dict[str, int] = {}
+
+        if isinstance(output, GeometryOutput):
+            if any(
+                getattr(labels, field.name) is not None
+                for field in fields(labels)
+                if not field.name.endswith("_mask") and field.name != "geometry_snapshot"
+            ):
+                raise ValueError("Protein-only geometry batches cannot carry drug or response labels")
+            zero = output.apo_tokens.sum() * 0.0
+            raw = {field.name: zero for field in fields(self.weights)}
+            counts = dict.fromkeys(raw, 0)
+            target, mask = labels.geometry_snapshot, labels.geometry_snapshot_mask
+            if target is not None:
+                if mask is None:
+                    raise ValueError("geometry_snapshot requires an explicit evidence mask")
+                predicted = predictions["geometry_snapshot"]
+                target = target.to(predicted)
+                if target.shape != predicted.shape or mask.shape != target.shape:
+                    raise ValueError("geometry_snapshot label shape must match geometry predictions")
+                valid = _resolve_mask(target, mask) & predictions["geometry_valid_mask"] & (target >= 0)
+                loss = F.smooth_l1_loss(predicted, target.nan_to_num(), reduction="none")
+                raw["geometry_snapshot"] = _masked_mean(loss, valid)
+                counts["geometry_snapshot"] = int(valid.sum().item())
+            weighted = {name: value * getattr(self.weights, name) for name, value in raw.items()}
+            return RIPPLELossOutput(sum(weighted.values(), zero), raw, weighted, counts)
 
         interaction_logit = predictions["interaction_logit"]
         if labels.interaction is None:
@@ -180,6 +209,7 @@ class RIPPLEMultiTaskLoss(nn.Module):
                 device=interaction_logit.device, dtype=interaction_logit.dtype
             )
             valid = _resolve_mask(target, labels.interaction_mask)
+            valid = valid & ((target == 0) | (target == 1))
             loss = F.binary_cross_entropy_with_logits(
                 interaction_logit,
                 target.nan_to_num().clamp(min=0.0, max=1.0),
@@ -197,6 +227,7 @@ class RIPPLEMultiTaskLoss(nn.Module):
                 device=affinity_prediction.device, dtype=affinity_prediction.dtype
             )
             valid = _resolve_mask(target, labels.affinity_mask)
+            valid = valid & predictions["affinity_valid_mask"]
             loss = F.smooth_l1_loss(
                 affinity_prediction, target.nan_to_num(), reduction="none"
             )
@@ -265,7 +296,7 @@ class RIPPLEMultiTaskLoss(nn.Module):
 
         allosteric_logits = predictions["allosteric_pocket_logits"]
         if labels.allosteric_pocket is None:
-            raw["allosteric_pocket"] = allosteric_logits.sum() * 0.0
+            raw["allosteric_pocket"] = interaction_logit.sum() * 0.0
             counts["allosteric_pocket"] = 0
         else:
             target = labels.allosteric_pocket.to(
@@ -347,6 +378,16 @@ class RIPPLEMultiTaskLoss(nn.Module):
 
 
 _STAGE_MODULES = {
+    TrainingStage.FOUNDATION: {
+        "conformer_encoder", "residue_encoder", "protein_fusion", "matcher",
+        "drug_fusion", "protein_resampler", "interaction",
+        "task_heads.global_projection", "task_heads.local_projection",
+        "task_heads.local_gate", "task_heads.binding_norm",
+        "task_heads.interaction_head", "task_heads.affinity_head", "task_heads.endpoint_embedding",
+    },
+    TrainingStage.EFFECT_WARMUP: {
+        "source_fusion", "propagation", "task_heads.effect_head",
+    },
     TrainingStage.POCKET: {
         "conformer_encoder",
         "residue_encoder",
@@ -387,6 +428,11 @@ _STAGE_MODULES = {
     },
     TrainingStage.JOINT: {""},
 }
+_STAGE_MODULES[TrainingStage.CHANNEL_FINETUNE] = (
+    _STAGE_MODULES[TrainingStage.FOUNDATION]
+    | _STAGE_MODULES[TrainingStage.EFFECT_WARMUP]
+    | {"structure_response.snapshot_readout"}
+)
 
 
 def _matches_prefix(parameter_name: str, prefixes: Set[str]) -> bool:
@@ -411,9 +457,20 @@ def configure_training_stage(
         parameter.requires_grad = _matches_prefix(name, prefixes)
 
 
-def stage_loss_weights(stage: Union[TrainingStage, str]) -> RIPPLELossWeights:
+def stage_loss_weights(
+    stage: Union[TrainingStage, str], *, reliable_interaction: bool = False,
+) -> RIPPLELossWeights:
     """Return objectives that have supervision in each curriculum stage."""
     stage = TrainingStage(stage)
+    if stage in {TrainingStage.FOUNDATION, TrainingStage.EFFECT_WARMUP, TrainingStage.CHANNEL_FINETUNE}:
+        values = dict.fromkeys((field.name for field in fields(RIPPLELossWeights)), 0.0)
+        if stage != TrainingStage.EFFECT_WARMUP:
+            values.update(affinity=1.0, native_pocket=1.0, interaction=float(reliable_interaction))
+        if stage != TrainingStage.FOUNDATION:
+            values["effect"] = 1.0
+        if stage == TrainingStage.CHANNEL_FINETUNE:
+            values["geometry_snapshot"] = 0.2
+        return RIPPLELossWeights(**values)
     weights = RIPPLELossWeights()
     enabled = {
         TrainingStage.POCKET: {"native_pocket", "allosteric_pocket", "pose_rank"},
@@ -437,15 +494,28 @@ def build_optimizer_param_groups(
     base_lr: float,
     weight_decay: float,
     backbone_lr_multiplier: float = 0.2,
+    stage: Optional[Union[TrainingStage, str]] = None,
 ) -> List[dict]:
     """Use a conservative LR for reusable geometry encoders."""
     backbone_prefixes = ("conformer_encoder.", "residue_encoder.", "protein_fusion.")
+    if stage is not None:
+        stage = TrainingStage(stage)
     backbone = []
     task_specific = []
     for name, parameter in model.named_parameters():
         if not parameter.requires_grad:
             continue
-        if name.removeprefix("core.").startswith(backbone_prefixes):
+        plain_name = name.removeprefix("core.")
+        if stage == TrainingStage.CHANNEL_FINETUNE:
+            is_backbone = not plain_name.startswith((
+                "task_heads.effect_head.",
+                "structure_response.snapshot_readout.",
+            ))
+        elif stage in {TrainingStage.FOUNDATION, TrainingStage.EFFECT_WARMUP}:
+            is_backbone = False
+        else:
+            is_backbone = plain_name.startswith(backbone_prefixes)
+        if is_backbone:
             backbone.append(parameter)
         else:
             task_specific.append(parameter)

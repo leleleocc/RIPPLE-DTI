@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, Optional
 
+import torch
 from torch import Tensor, cat, nn
 
 from src.ripple.conformer_encoder import ConformerEncoding, MultiConformerEncoder
@@ -53,6 +54,27 @@ class RIPPLEBatch:
 
 
 @dataclass
+class GeometryBatch:
+    """Protein-only batch; nodes identify a chain copy and canonical position."""
+
+    residue_features: Tensor
+    residue_coords: Tensor
+    residue_mask: Tensor
+    edge_index: Tensor
+    edge_mask: Tensor
+    geometry_queries: GeometryQueries
+    edge_features: Optional[Tensor] = None
+    protein_sequence_tokens: Optional[Tensor] = None
+
+
+@dataclass
+class GeometryOutput:
+    predictions: Dict[str, Tensor]
+    apo_tokens: Tensor
+    structure_gate: Tensor
+
+
+@dataclass
 class RIPPLEOutput:
     predictions: Dict[str, Tensor]
     conformers: ConformerEncoding
@@ -88,7 +110,7 @@ class RIPPLEDTI(nn.Module):
         drug_latents: int = 32,
         protein_latents: int = 32,
         num_affinity_endpoints: int = 4,
-        num_effect_classes: int = 3,
+        num_effect_classes: int = 2,
         num_mechanism_classes: int = 6,
         dropout: float = 0.1,
         matcher_temperature: float = 1.0,
@@ -160,28 +182,46 @@ class RIPPLEDTI(nn.Module):
         self.structure_response = StructureResponseHead(dim, dropout)
         self.gating_head = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, 3))
 
-    def forward(self, batch: RIPPLEBatch) -> RIPPLEOutput:
-        conformers = self.conformer_encoder(
-            batch.atom_features,
-            batch.atom_coords,
-            batch.atom_mask,
-            batch.conformer_mask,
-            batch.conformer_energy,
-        )
-
+    def encode_protein(self, batch: RIPPLEBatch | GeometryBatch):
+        mask = batch.residue_mask.bool()
+        if not mask.any(-1).all():
+            raise ValueError("Every sample requires mapped residues with coordinates")
+        if not torch.isfinite(batch.residue_coords[mask]).all():
+            raise ValueError("Valid residue coordinates must be finite")
+        if not torch.isfinite(batch.residue_features[mask]).all():
+            raise ValueError("Valid residue features must be finite")
+        # Missing coordinates may be NaN in the cache; sanitize before graph arithmetic.
+        features = torch.where(mask[..., None], batch.residue_features, 0.0)
+        coords = torch.where(mask[..., None], batch.residue_coords, 0.0)
         structural_tokens = self.residue_encoder.encode_residues(
-            residue_features=batch.residue_features,
-            residue_coords=batch.residue_coords,
-            residue_mask=batch.residue_mask,
+            residue_features=features,
+            residue_coords=coords,
+            residue_mask=mask,
             edge_index=batch.edge_index,
             edge_mask=batch.edge_mask,
             edge_features=batch.edge_features,
         )
-        apo_tokens, structure_gate = self.protein_fusion(
-            residue_features=batch.residue_features,
+        sequence_tokens = batch.protein_sequence_tokens
+        if sequence_tokens is not None:
+            sequence_tokens = torch.where(mask[..., None], sequence_tokens, 0.0)
+        return self.protein_fusion(
+            residue_features=features,
             structural_tokens=structural_tokens,
-            residue_mask=batch.residue_mask,
-            sequence_tokens=batch.protein_sequence_tokens,
+            residue_mask=mask,
+            sequence_tokens=sequence_tokens,
+        )
+
+    def forward(self, batch: RIPPLEBatch | GeometryBatch) -> RIPPLEOutput | GeometryOutput:
+        apo_tokens, structure_gate = self.encode_protein(batch)
+        if isinstance(batch, GeometryBatch):
+            predictions = self.structure_response.snapshot(
+                apo_tokens, batch.residue_coords, batch.residue_mask, batch.geometry_queries,
+            )
+            return GeometryOutput(predictions, apo_tokens, structure_gate)
+
+        conformers = self.conformer_encoder(
+            batch.atom_features, batch.atom_coords, batch.atom_mask,
+            batch.conformer_mask, batch.conformer_energy,
         )
         pockets = self.residue_encoder.extract_pockets(
             residue_tokens=apo_tokens,
@@ -229,7 +269,7 @@ class RIPPLEDTI(nn.Module):
         )
         propagation = self.propagation(
             residue_tokens=apo_tokens,
-            residue_coords=batch.residue_coords,
+            residue_coords=torch.where(batch.residue_mask[..., None], batch.residue_coords, 0.0),
             residue_mask=pockets.residue_mask,
             edge_index=batch.edge_index,
             edge_mask=batch.edge_mask,

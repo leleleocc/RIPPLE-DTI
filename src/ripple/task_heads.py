@@ -28,7 +28,7 @@ class RIPPLETaskHeads(nn.Module):
         self,
         dim: int = 128,
         num_affinity_endpoints: int = 4,
-        num_effect_classes: int = 3,
+        num_effect_classes: int = 2,
         num_mechanism_classes: int = 6,
         dropout: float = 0.1,
         local_gate_bias: float = -2.0,
@@ -79,13 +79,13 @@ class RIPPLETaskHeads(nn.Module):
             endpoint_index = torch.zeros(
                 batch_size, device=binding_state.device, dtype=torch.long
             )
+            affinity_valid_mask = torch.zeros_like(endpoint_index, dtype=torch.bool)
         else:
-            endpoint_index = (
-                endpoint_type.to(device=binding_state.device, dtype=torch.long) + 1
-            )
-            endpoint_index = endpoint_index.clamp(
-                min=0, max=self.num_affinity_endpoints
-            )
+            endpoint_type = endpoint_type.to(device=binding_state.device, dtype=torch.long)
+            if endpoint_type.shape != (batch_size,):
+                raise ValueError("endpoint_type must have shape [B]")
+            affinity_valid_mask = (endpoint_type >= 0) & (endpoint_type < self.num_affinity_endpoints)
+            endpoint_index = torch.where(affinity_valid_mask, endpoint_type + 1, 0)
         endpoint_state = self.endpoint_embedding(endpoint_index)
 
         effect_features = torch.cat(
@@ -108,6 +108,7 @@ class RIPPLETaskHeads(nn.Module):
             "affinity": self.affinity_head(
                 torch.cat([binding_state, endpoint_state], dim=-1)
             ).squeeze(-1),
+            "affinity_valid_mask": affinity_valid_mask,
             "effect_logits": self.effect_head(effect_features),
             "mechanism_logits": self.mechanism_head(effect_features),
             "allosteric_pocket_logits": allosteric_pocket_logit,

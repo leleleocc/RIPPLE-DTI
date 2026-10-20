@@ -85,7 +85,7 @@ def test_full_model_forward_masks_and_backward():
 
     assert output.predictions["interaction_logit"].shape == (2,)
     assert output.predictions["affinity"].shape == (2,)
-    assert output.predictions["effect_logits"].shape == (2, 3)
+    assert output.predictions["effect_logits"].shape == (2, 2)
     assert output.predictions["mechanism_logits"].shape == (2, 6)
     assert output.match.joint_weight.shape == (2, 2, 3)
     assert output.propagation.delta_tokens.shape == (2, 10, 16)

@@ -16,7 +16,13 @@ The ion-channel extension adds invariant geometry targets, ligand-conditioned
 structural response, and shared-weight comparison of the same protein's states.
 """
 
-from src.ripple.model import RIPPLEDTI, RIPPLEBatch, RIPPLEOutput
+from src.ripple.model import (
+    RIPPLEDTI,
+    GeometryBatch,
+    GeometryOutput,
+    RIPPLEBatch,
+    RIPPLEOutput,
+)
 from src.ripple.structure_response import (
     GeometryQueries,
     MultiStateOutput,
@@ -33,17 +39,19 @@ from src.ripple.training import (
 )
 
 __all__ = [
-    "RIPPLEBatch",
     "RIPPLEDTI",
+    "GeometryBatch",
+    "GeometryOutput",
+    "GeometryQueries",
+    "MultiStateOutput",
+    "RIPPLEBatch",
     "RIPPLELabels",
     "RIPPLELossWeights",
+    "RIPPLEMultiState",
     "RIPPLEMultiTaskLoss",
     "RIPPLEOutput",
     "TrainingStage",
     "build_optimizer_param_groups",
     "configure_training_stage",
     "stage_loss_weights",
-    "GeometryQueries",
-    "RIPPLEMultiState",
-    "MultiStateOutput",
 ]

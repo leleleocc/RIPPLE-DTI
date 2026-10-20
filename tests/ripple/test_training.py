@@ -35,7 +35,7 @@ def test_multisource_loss_ignores_missing_labels():
     labels = RIPPLELabels(
         interaction=torch.tensor([1.0, 0.0]),
         affinity=torch.tensor([7.2, float("nan")]),
-        effect=torch.tensor([2, -1]),
+        effect=torch.tensor([1, -1]),
         native_pocket_index=torch.tensor([0, 1]),
         native_pocket_mask=torch.tensor([True, False]),
     )

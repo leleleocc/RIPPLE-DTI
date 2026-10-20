@@ -32,15 +32,8 @@ class StructureResponseHead(nn.Module):
         self.readout = PredictionMLP(dim * 5 + 1, dim * 2, 1, dropout)
         self.snapshot_readout = PredictionMLP(dim * 2, dim, 1, dropout)
 
-    def forward(
-        self,
-        apo_tokens: Tensor,
-        delta_tokens: Tensor,
-        chemical_context: Tensor,
-        coords: Tensor,
-        residue_mask: Tensor,
-        queries: GeometryQueries,
-    ) -> dict[str, Tensor]:
+    @staticmethod
+    def _pairs(coords: Tensor, residue_mask: Tensor, queries: GeometryQueries):
         indices, requested = queries.indices, queries.pair_mask
         if indices.ndim != 4 or indices.size(-1) != 2 or indices.dtype != torch.long:
             raise ValueError("geometry indices must be int64 [B, M, P, 2]")
@@ -54,15 +47,35 @@ class StructureResponseHead(nn.Module):
         left, right = safe.unbind(dim=-1)
         valid = requested.bool() & in_range & (left != right)
         valid = valid & residue_mask[batch, left] & residue_mask[batch, right]
-        # Sanitize masked padding before any arithmetic, including NaN padding.
         xyz_left, xyz_right = coords[batch, left], coords[batch, right]
-        valid = (
-            valid & torch.isfinite(xyz_left).all(-1) & torch.isfinite(xyz_right).all(-1)
-        )
+        valid = valid & torch.isfinite(xyz_left).all(-1) & torch.isfinite(xyz_right).all(-1)
         distance = torch.linalg.vector_norm(
-            torch.where(valid[..., None], xyz_left - xyz_right, 0.0),
-            dim=-1,
+            torch.where(valid[..., None], xyz_left - xyz_right, 0.0), dim=-1,
         )
+        return batch, left, right, valid, distance
+
+    def snapshot(self, apo_tokens, coords, residue_mask, queries):
+        batch, left, right, valid, distance = self._pairs(coords, residue_mask, queries)
+        a, b = apo_tokens[batch, left], apo_tokens[batch, right]
+        features = torch.where(valid[..., None], torch.cat([a + b, (a - b).abs()], -1), 0.0)
+        predicted = torch.nn.functional.softplus(self.snapshot_readout(features).squeeze(-1))
+        denominator = valid.sum(-1).clamp_min(1)
+        return {
+            "geometry_snapshot": torch.where(valid, predicted, 0.0).sum(-1) / denominator,
+            "geometry_reference": distance.sum(-1) / denominator,
+            "geometry_valid_mask": valid.any(-1),
+        }
+
+    def forward(
+        self,
+        apo_tokens: Tensor,
+        delta_tokens: Tensor,
+        chemical_context: Tensor,
+        coords: Tensor,
+        residue_mask: Tensor,
+        queries: GeometryQueries,
+    ) -> dict[str, Tensor]:
+        batch, left, right, valid, distance = self._pairs(coords, residue_mask, queries)
         a, b = apo_tokens[batch, left], apo_tokens[batch, right]
         da, db = delta_tokens[batch, left], delta_tokens[batch, right]
         context = chemical_context[:, None, None, :].expand_as(a)

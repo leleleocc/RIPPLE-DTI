@@ -18,13 +18,14 @@ Read the [model guide](docs/MODEL.md) for inputs, outputs and the two-stage plan
 The [documentation map](docs/README.md) links the three consolidated guides:
 data, model, and training strategy with scripts.
 
-| Area | Actual status as of 2026-10-16 |
+| Area | Actual status as of 2026-10-20 |
 |---|---|
 | Base data | Five-source metadata audit; 300 complexes checked at residue level |
 | Channel pilot | 8 structures checked, 16 geometry values, 10 structural differences, 103 pharmacology records |
 | Model | Base interaction/propagation and channel readouts implemented |
 | Local execution | Mac CPU, small 32-dimensional model, 64 updates of the structure subgraph only |
-| Formal experiments | Feature cache, audited splits, full training loop and held-out evaluation still pending |
+| Training infrastructure | Two-stage training, sparse-label batching, checkpoint resume and held-out evaluation implemented; CPU and two-process checks available |
+| Formal experiments | Audited splits and real feature caches still pending; four-GPU CUDA/AMP not yet measured |
 
 The local check learned to reconstruct current geometry. It did not train
 ligand-induced changes or channel opening/closing. A separate full-model
@@ -64,8 +65,10 @@ src/ripple/pose_confidence.py  pose re-ranking and soft modulation
 src/ripple/training.py         masked multi-task loss and curriculum
 src/ripple/structure_response.py geometry readouts and shared-weight state comparison
 src/ripple/data/channels.py    observed-geometry pilot loader
-src/ripple/train.py            production training entry point (loop pending)
-src/ripple/evaluate.py         production evaluation interface (pending)
+src/ripple/train.py            two-stage training, checkpoint transfer and resume
+src/ripple/evaluate.py         frozen-partition evaluation CLI
+src/ripple/data/manifest.py    versioned identities, evidence and partition checks
+src/ripple/data/dataset.py     tensor cache reader and sparse-label collation
 src/ripple/data/schema.py      which source may supervise which label
 scripts/ripple/                source parsing, cache, cold splits
 configs/ripple_network.yaml    model and loss weights
@@ -89,9 +92,12 @@ for the output tables, filters, and remaining training prerequisites.
 
 The plan is base pretraining followed by channel enhancement/inhibition tuning,
 with current-geometry reconstruction and base-task replay as auxiliary tasks.
-The full cache builder and training loop are still stubs, and the existing
-internal stage policies do not yet implement this plan. Follow the
-[training strategy and scripts](docs/TRAINING.md) before formal training.
+The training loop implements this plan with a warmup for source fusion,
+propagation and the effect head. Geometry batches run without drug features.
+Read the [cache contract and commands](docs/CACHE.md) and
+[training strategy](docs/TRAINING.md). Raw feature extraction and sequence
+clustering remain upstream prerequisites; synthetic regression tests do not
+establish predictive performance on real data.
 
 ## Ion-Channel Pilot
 
