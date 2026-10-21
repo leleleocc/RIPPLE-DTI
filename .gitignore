@@ -23,6 +23,7 @@ __pycache__/
 .coverage
 htmlcov/
 .venv/
+.venv-data/
 venv/
 
 # Editors and operating systems

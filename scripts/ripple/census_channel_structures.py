@@ -42,8 +42,13 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=ROOT / "data/processed/planning_20261017/structures")
     parser.add_argument("--cutoff", default="2026-10-17")
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--uniprot-aliases", type=Path, help="UniProt TSV with Entry Name and Entry columns")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    aliases = {}
+    if args.uniprot_aliases:
+        with args.uniprot_aliases.open() as handle:
+            aliases = {row["Entry Name"]: row["Entry"] for row in csv.DictReader(handle, delimiter="\t")}
     text = io.StringIO(args.targets.read_text(encoding="utf-8-sig"))
     release = next(text).strip()
     rows = [row for row in csv.DictReader(text) if row["Type"] in CHANNEL_TYPES]
@@ -55,6 +60,9 @@ def main() -> None:
             for accession in row[f"{species} SwissProt"].split("|"):
                 accession = accession.strip()
                 if accession:
+                    accession = aliases.get(accession, accession)
+                    if "_" in accession:
+                        raise ValueError(f"Catalogue uses entry name {accession}; resolve it with --uniprot-aliases.")
                     accession_info[accession].append({
                         "species": species.lower(), "type": row["Type"],
                         "target_id": row["Target id"], "target_name": row["Target name"],
@@ -134,6 +142,7 @@ def main() -> None:
     summary = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(), "release_cutoff": args.cutoff,
         "source_release": release, "source_url": TARGET_URL, "source_sha256": sha256(args.targets),
+        "uniprot_aliases": {"path": str(args.uniprot_aliases), "sha256": sha256(args.uniprot_aliases), "mapping": aliases} if args.uniprot_aliases else None,
         "query_url": ENDPOINT, "query_sha256": sha256(request_path), "response_sha256": sha256(response_path),
         "retrieval": json.loads(retrieval_path.read_text(encoding="utf-8")),
         "channel_catalogue_rows_excluding_piezo": len(rows),

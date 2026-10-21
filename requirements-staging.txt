@@ -1,0 +1,5 @@
+# Isolated CPU data environment; does not change the training environment.
+numpy==1.26.4
+pyarrow==19.0.1
+rdkit==2024.3.2
+gemmi==0.7.1
